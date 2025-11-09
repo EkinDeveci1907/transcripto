@@ -9,8 +9,14 @@ cd backend
 python -m venv .venv
 source .venv/bin/activate  # Windows: .venv\\Scripts\\activate
 pip install -r requirements.txt
-cp .env.example .env  # put your OPENAI_API_KEY
+cp .env.example .env
+# Option A: Demo mode (no API key required)
+#   Ensure USE_MOCK=true in .env (default), then run:
 uvicorn main:app --reload --port 8000
+
+# Option B: Real transcription/summarization
+#   Put your OPENAI_API_KEY in .env and set USE_MOCK=false, then run:
+# uvicorn main:app --reload --port 8000
 ```
 
 ## Endpoint

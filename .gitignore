@@ -19,6 +19,7 @@ pnpm-debug.log*
 .env
 .env.*
 !.env.local.example
+!**/.env.example
 
 # Mac / OS
 .DS_Store
