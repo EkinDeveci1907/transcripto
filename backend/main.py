@@ -9,7 +9,7 @@ from openai import OpenAI
 # Ensure values in .env override any previously exported shell variables (e.g. earlier USE_MOCK=true)
 load_dotenv(override=True)
 
-USE_MOCK = os.getenv("USE_MOCK", "false").lower() == "true"
+USE_MOCK = os.getenv("USE_MOCK", "true").lower() == "true"
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 if not OPENAI_API_KEY and not USE_MOCK:
     raise RuntimeError("OPENAI_API_KEY not set in environment. Set USE_MOCK=true to run without external APIs.")
@@ -51,14 +51,13 @@ async def health():
 
 @app.post("/upload", response_model=TranscriptionResponse)
 async def upload(file: UploadFile = File(...)):
-    if file.content_type is None:
-        raise HTTPException(status_code=400, detail="File content type missing")
     # Accept common audio/video containers supported by Whisper
     if not any(ext in file.filename.lower() for ext in [
         ".webm", ".wav", ".mp3", ".m4a", ".ogg", ".mp4", ".mov"
     ]):
         raise HTTPException(status_code=400, detail="Unsupported file format")
 
+    tmp_path = None
     try:
         # Save to temp file and capture size
         with tempfile.NamedTemporaryFile(delete=False, suffix=file.filename) as tmp:
@@ -100,7 +99,8 @@ async def upload(file: UploadFile = File(...)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     finally:
-        try:
-            os.remove(tmp_path)
-        except Exception:
-            pass
+        if tmp_path:
+            try:
+                os.remove(tmp_path)
+            except Exception:
+                pass
