@@ -6,7 +6,8 @@ from dotenv import load_dotenv
 from pydantic import BaseModel
 from openai import OpenAI
 
-load_dotenv()
+# Ensure values in .env override any previously exported shell variables (e.g. earlier USE_MOCK=true)
+load_dotenv(override=True)
 
 USE_MOCK = os.getenv("USE_MOCK", "false").lower() == "true"
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
@@ -30,7 +31,11 @@ app = FastAPI(title="Transcripto Backend")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    # Allow common local dev origins (both localhost and 127.0.0.1)
+    allow_origins=[
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"]
@@ -40,11 +45,18 @@ class TranscriptionResponse(BaseModel):
     transcript: str
     summary: str
 
+@app.get("/health")
+async def health():
+    return {"status": "ok", "mock": USE_MOCK}
+
 @app.post("/upload", response_model=TranscriptionResponse)
 async def upload(file: UploadFile = File(...)):
     if file.content_type is None:
         raise HTTPException(status_code=400, detail="File content type missing")
-    if not any(ext in file.filename.lower() for ext in [".webm", ".wav", ".mp3", ".m4a", ".ogg"]):
+    # Accept common audio/video containers supported by Whisper
+    if not any(ext in file.filename.lower() for ext in [
+        ".webm", ".wav", ".mp3", ".m4a", ".ogg", ".mp4", ".mov"
+    ]):
         raise HTTPException(status_code=400, detail="Unsupported file format")
 
     try:
