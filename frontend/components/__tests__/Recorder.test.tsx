@@ -9,8 +9,45 @@ jest.mock('axios');
 const mockedAxios = axios as jest.Mocked<typeof axios>;
 
 function setupMediaMocks() {
-  const mockTrack = { stop: jest.fn() };
-  const mockStream = { getTracks: () => [mockTrack] } as MediaStream;
+  // Mock a minimal MediaStreamTrack with required shape
+  const mockTrack: MediaStreamTrack = {
+    id: 't1',
+    kind: 'audio',
+    label: 'mock',
+    enabled: true,
+    muted: false,
+    readyState: 'live',
+    contentHint: '',
+    stop: jest.fn(),
+    applyConstraints: jest.fn() as any,
+    clone: jest.fn() as any,
+    getCapabilities: jest.fn() as any,
+    getConstraints: jest.fn() as any,
+    getSettings: jest.fn() as any,
+    onended: null,
+    onmute: null,
+    onunmute: null,
+    addEventListener: jest.fn() as any,
+    removeEventListener: jest.fn() as any,
+    dispatchEvent: jest.fn() as any,
+  } as unknown as MediaStreamTrack;
+
+  // Mock a MediaStream that satisfies the DOM typings
+  const mockStream: MediaStream = {
+    id: 's1',
+    active: true,
+    getTracks: () => [mockTrack],
+    getAudioTracks: () => [mockTrack],
+    getVideoTracks: () => [],
+    getTrackById: jest.fn() as any,
+    addTrack: jest.fn() as any,
+    removeTrack: jest.fn() as any,
+    onaddtrack: null,
+    onremovetrack: null,
+    addEventListener: jest.fn() as any,
+    removeEventListener: jest.fn() as any,
+    dispatchEvent: jest.fn() as any,
+  } as unknown as MediaStream;
 
   Object.defineProperty(global.navigator, 'mediaDevices', {
     value: {
@@ -20,12 +57,33 @@ function setupMediaMocks() {
   });
 
   class MockMediaRecorder {
-    public stream = mockStream;
+    public stream: MediaStream;
+    public state: RecordingState = 'inactive';
+  public mimeType = 'audio/webm';
+  public audioBitsPerSecond = 0;
+  public videoBitsPerSecond = 0;
     public ondataavailable: ((event: BlobEvent) => void) | null = null;
     public onstop: (() => void) | null = null;
-    start() {}
+    public onerror: ((this: MediaRecorder, ev: Event) => any) | null = null;
+    public onpause: ((this: MediaRecorder, ev: Event) => any) | null = null;
+    public onresume: ((this: MediaRecorder, ev: Event) => any) | null = null;
+    public onstart: ((this: MediaRecorder, ev: Event) => any) | null = null;
+
+    constructor(stream: MediaStream, _options?: MediaRecorderOptions) {
+      this.stream = stream;
+    }
+
+    static isTypeSupported(_type: string): boolean {
+      return true;
+    }
+
+    start(_timeslice?: number) {
+      this.state = 'recording';
+      // no-op: optionally notify onstart handler
+    }
     stop() {
-      this.ondataavailable?.({ data: new Blob(['test'], { type: 'audio/webm' }) } as BlobEvent);
+      this.ondataavailable?.({ data: new Blob(['test'], { type: 'audio/webm' }) } as unknown as BlobEvent);
+      this.state = 'inactive';
       this.onstop?.();
     }
     pause() {}
@@ -39,7 +97,7 @@ function setupMediaMocks() {
   }
 
   Object.defineProperty(global, 'MediaRecorder', {
-    value: MockMediaRecorder as typeof MediaRecorder,
+    value: MockMediaRecorder as unknown as typeof MediaRecorder,
     configurable: true,
   });
 }
