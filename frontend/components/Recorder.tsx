@@ -48,13 +48,15 @@ export default function Recorder() {
     setRecording(false);
   }
 
+  const apiBase = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8000';
+
   async function upload(blob: Blob) {
     setLoading(true);
     setError(null);
     try {
       const formData = new FormData();
       formData.append('file', blob, 'audio.webm');
-      const response = await axios.post<ApiResponse>('http://localhost:8000/upload', formData, {
+      const response = await axios.post<ApiResponse>(`${apiBase}/upload`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
       setResult(response.data);
