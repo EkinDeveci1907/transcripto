@@ -49,7 +49,9 @@ export default function Recorder() {
     setRecording(false);
   }
 
-  const apiBase = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8000';
+  // Use Next.js API proxy route to avoid CORS / mixed-origin issues.
+  // Backend base URL is handled server-side in /api/upload.
+  const apiUploadUrl = '/api/upload';
 
   async function upload(blob: Blob) {
     setLoading(true);
@@ -57,7 +59,7 @@ export default function Recorder() {
     try {
       const formData = new FormData();
       formData.append('file', blob, 'audio.webm');
-      const response = await axios.post<ApiResponse>(`${apiBase}/upload`, formData, {
+      const response = await axios.post<ApiResponse>(apiUploadUrl, formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
       setResult(response.data);
