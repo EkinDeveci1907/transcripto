@@ -44,6 +44,8 @@ venv/
 htmlcov/
 .pytest_cache/
 .coverage*
+coverage.xml
+frontend/coverage/
 
 # Misc
 *.swp

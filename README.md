@@ -1,5 +1,8 @@
 # Transcripto
 
+[![CI](https://github.com/ekindeveci1907/transcripto/actions/workflows/ci.yml/badge.svg)](https://github.com/ekindeveci1907/transcripto/actions/workflows/ci.yml)
+[![Coverage](https://codecov.io/gh/ekindeveci1907/transcripto/branch/main/graph/badge.svg)](https://codecov.io/gh/ekindeveci1907/transcripto)
+
 Early MVP scaffold for an audio recording + transcription + AI summarization app.
 
 ## Structure
@@ -53,6 +56,14 @@ Frontend `.env.local` (optional, see `frontend/.env.local.example`):
 ```
 NEXT_PUBLIC_API_BASE=http://127.0.0.1:8000
 ```
+
+## Testing
+- Backend: `cd backend && pytest --cov=main --cov-report=term-missing` (mock + real-path coverage)
+- Frontend: `cd frontend && npm run lint && npm test` (use `npm run test:coverage` for coverage)
+
+### CI & Coverage Badges
+- GitHub Actions workflow: `.github/workflows/ci.yml`
+- Coverage badges powered by Codecov; set a `CODECOV_TOKEN` repository secret to let the workflow upload `backend/coverage.xml` and `frontend/coverage/lcov.info`.
 
 ## License
 TBD.

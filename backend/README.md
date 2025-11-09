@@ -26,3 +26,35 @@ uvicorn main:app --reload --port 8000
   - Response: `{ "transcript": string, "summary": string }`
 
 CORS allows http://localhost:3000 by default.
+
+## Tests
+
+- Mock mode: `pytest tests/test_api.py`
+- Real-path (stubbed OpenAI client): `pytest tests/test_api_real.py`
+- Full suite: `pytest`
+
+## Docker
+
+Build argument defaults:
+- `SUMMARY_MODEL` (default `gpt-4o-mini`)
+- `WHISPER_MODEL` (default `whisper-1`)
+- `USE_MOCK_FLAG` (default `true`)
+- `PORT` (default `8000`)
+
+Example usage:
+
+```bash
+# Build for staging with real models baked in
+docker build \
+  --build-arg SUMMARY_MODEL=gpt-4o-mini \
+  --build-arg WHISPER_MODEL=whisper-1 \
+  --build-arg USE_MOCK_FLAG=false \
+  --build-arg PORT=8080 \
+  -t transcripto-backend .
+
+# Run in mock mode (default). Override OPENAI_API_KEY/USE_MOCK at runtime as needed.
+docker run -p 8080:8080 \
+  -e OPENAI_API_KEY=sk-your-key \
+  -e USE_MOCK=false \
+  transcripto-backend
+```
