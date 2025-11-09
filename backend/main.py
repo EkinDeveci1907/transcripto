@@ -29,16 +29,21 @@ def get_openai_client():
 
 app = FastAPI(title="Transcripto Backend")
 
+ALLOW_ALL_CORS = os.getenv("DEV_ALLOW_ALL_CORS", "false").lower() == "true"
+
+cors_origins = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+]
+if ALLOW_ALL_CORS:
+    cors_origins = ["*"]
+
 app.add_middleware(
     CORSMiddleware,
-    # Allow common local dev origins (both localhost and 127.0.0.1)
-    allow_origins=[
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-    ],
+    allow_origins=cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
-    allow_headers=["*"]
+    allow_headers=["*"],
 )
 
 class TranscriptionResponse(BaseModel):
@@ -47,7 +52,7 @@ class TranscriptionResponse(BaseModel):
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "mock": USE_MOCK}
+    return {"status": "ok", "mock": USE_MOCK, "allow_all_cors": ALLOW_ALL_CORS}
 
 @app.post("/upload", response_model=TranscriptionResponse)
 async def upload(file: UploadFile = File(...)):
