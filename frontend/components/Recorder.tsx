@@ -44,7 +44,7 @@ export default function Recorder() {
 
   function stopRecording() {
     mediaRecorderRef.current?.stop();
-    mediaRecorderRef.current?.stream.getTracks().forEach(t => t.stop());
+  mediaRecorderRef.current?.stream.getTracks().forEach((t: MediaStreamTrack) => t.stop());
     setRecording(false);
   }
 

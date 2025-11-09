@@ -16,7 +16,15 @@ if not OPENAI_API_KEY and not USE_MOCK:
 SUMMARY_MODEL = os.getenv("OPENAI_SUMMARY_MODEL", "gpt-4o-mini")
 WHISPER_MODEL = os.getenv("OPENAI_WHISPER_MODEL", "whisper-1")
 
-client = OpenAI(api_key=OPENAI_API_KEY) if not USE_MOCK else None
+def get_openai_client():
+    if USE_MOCK:
+        return None
+    try:
+        # Rely on explicit api_key (can also use env var)
+        return OpenAI(api_key=OPENAI_API_KEY)
+    except TypeError as e:
+        # Likely httpx incompatibility (proxies arg). Fallback to mock mode instructions.
+        raise RuntimeError(f"Failed to initialize OpenAI client: {e}. Try pinning httpx==0.27.2 & httpcore==0.18.0 or upgrading openai.")
 
 app = FastAPI(title="Transcripto Backend")
 
@@ -50,6 +58,7 @@ async def upload(file: UploadFile = File(...)):
             transcript_text = f"[mock] Received {len(contents)} bytes from {file.filename}."
             summary_text = "[mock] Summary: Demo mode is enabled (no external API calls)."
         else:
+            client = get_openai_client()
             # Transcribe with Whisper
             with open(tmp_path, "rb") as f:
                 transcription = client.audio.transcriptions.create(
