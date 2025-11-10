@@ -13,13 +13,19 @@ export default function Recorder() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<ApiResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [processMs, setProcessMs] = useState<string | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const [dragActive, setDragActive] = useState(false);
+  
+  // If defined at build time, use direct backend uploads for large files to bypass
+  // Vercel serverless body-size limits. We still keep the proxy for small blobs.
+  const directApiBase = process.env.NEXT_PUBLIC_API_BASE || '';
 
   async function startRecording() {
     setError(null);
     setResult(null);
+    setProcessMs(null);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mediaRecorder = new MediaRecorder(stream);
@@ -54,20 +60,39 @@ export default function Recorder() {
   // Backend base URL is handled server-side in /api/upload.
   const apiUploadUrl = '/api/upload';
 
-  async function upload(blob: Blob) {
+  async function upload(blob: Blob, filename?: string) {
     setLoading(true);
     setError(null);
+    setProcessMs(null);
     try {
       const formData = new FormData();
-      formData.append('file', blob, 'audio.webm');
-      const response = await axios.post<ApiResponse>(apiUploadUrl, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
-      setResult(response.data);
-      // If backend provided a summary_error, surface it non-blocking
-      if (response.data.summary_error) {
-        setError(response.data.summary_error);
+      // Preserve provided filename when available; default to generic name
+      formData.append('file', blob, filename || 'audio.webm');
+
+      // If a large file and we have a public backend URL, upload directly to the backend
+      // to avoid Vercel's serverless body-size limits on the proxy route.
+      const isLarge = blob.size > 4_000_000; // ~4MB threshold
+      if (isLarge && directApiBase) {
+        const resp = await fetch(`${directApiBase}/upload`, { method: 'POST', body: formData });
+        const ms = resp.headers.get('x-process-time-ms');
+        if (ms) setProcessMs(ms);
+        const contentType = resp.headers.get('content-type') || '';
+        if (!resp.ok) {
+          const payload = contentType.includes('application/json') ? await resp.json() : { detail: await resp.text() };
+          throw new Error(payload?.detail || 'Upload failed');
+        }
+        const data = contentType.includes('application/json') ? await resp.json() : { transcript: await resp.text(), summary: '' };
+        setResult(data as ApiResponse);
+        if ((data as ApiResponse).summary_error) setError((data as ApiResponse).summary_error || null);
+        return;
       }
+
+      // Default path: use our Next.js proxy route
+      const response = await axios.post<ApiResponse>(apiUploadUrl, formData);
+      setResult(response.data);
+      const ms = response.headers?.['x-process-time-ms'];
+      if (ms) setProcessMs(String(ms));
+      if (response.data.summary_error) setError(response.data.summary_error);
     } catch (err: any) {
       setError(err.response?.data?.detail || err.message || 'Upload failed');
     } finally {
@@ -77,6 +102,8 @@ export default function Recorder() {
 
   function onFilePicked(file: File | null) {
     if (!file) return;
+    setResult(null);
+    setProcessMs(null);
     const allowed = [
       'audio/webm','audio/wav','audio/x-wav','audio/mpeg','audio/mp3','audio/ogg','audio/mp4','audio/m4a',
       'video/mp4','video/mpeg','video/quicktime'
@@ -87,7 +114,7 @@ export default function Recorder() {
       setError('Unsupported file type. Use mp3/mp4/wav/webm/ogg/m4a.');
       return;
     }
-    upload(file);
+    upload(file, file.name);
   }
 
   function onInputChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -138,6 +165,16 @@ export default function Recorder() {
             <label htmlFor="file-input" className="primary inline-block cursor-pointer">Choose a file</label>
           </div>
         </div>
+      </div>
+      <div className="flex items-center justify-center gap-3">
+        <button
+          className="secondary px-3 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-sm"
+          onClick={() => { setResult(null); setError(null); setProcessMs(null); }}
+          disabled={loading}
+        >
+          Clear
+        </button>
+        {processMs && <span className="text-xs text-white/60">Processed in {processMs} ms</span>}
       </div>
       {loading && (
         <div className="flex items-center justify-center space-x-3">

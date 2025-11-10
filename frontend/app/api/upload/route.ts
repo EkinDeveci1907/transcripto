@@ -28,24 +28,33 @@ export async function POST(req: NextRequest) {
     });
 
     const contentType = resp.headers.get('content-type') || '';
+    const xProc = resp.headers.get('x-process-time-ms') || undefined;
     if (!resp.ok) {
       // Try to surface backend error details
       if (contentType.includes('application/json')) {
         const data = await resp.json();
-        return NextResponse.json(data, { status: resp.status });
+        const res = NextResponse.json(data, { status: resp.status });
+        if (xProc) res.headers.set('x-process-time-ms', xProc);
+        return res;
       } else {
         const text = await resp.text();
-        return NextResponse.json({ detail: text || 'Upstream error' }, { status: resp.status });
+        const res = NextResponse.json({ detail: text || 'Upstream error' }, { status: resp.status });
+        if (xProc) res.headers.set('x-process-time-ms', xProc);
+        return res;
       }
     }
 
     // Success path
     if (contentType.includes('application/json')) {
       const data = await resp.json();
-      return NextResponse.json(data);
+      const res = NextResponse.json(data);
+      if (xProc) res.headers.set('x-process-time-ms', xProc);
+      return res;
     } else {
       const text = await resp.text();
-      return NextResponse.json({ transcript: text, summary: '' });
+      const res = NextResponse.json({ transcript: text, summary: '' });
+      if (xProc) res.headers.set('x-process-time-ms', xProc);
+      return res;
     }
   } catch (err: any) {
     const message = err?.message || 'Proxy failed';
