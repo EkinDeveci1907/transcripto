@@ -46,11 +46,18 @@ async def timing_middleware(request: Request, call_next):
     return response
 
 ALLOW_ALL_CORS = os.getenv("DEV_ALLOW_ALL_CORS", "false").lower() == "true"
+ALLOWED_ORIGINS_ENV = os.getenv("ALLOWED_ORIGINS", "")  # comma-separated list for production
 
-cors_origins = [
+cors_origins = []
+if ALLOWED_ORIGINS_ENV.strip():
+    cors_origins.extend([o.strip() for o in ALLOWED_ORIGINS_ENV.split(",") if o.strip()])
+
+# Always include local dev origins
+cors_origins.extend([
     "http://localhost:3000",
     "http://127.0.0.1:3000",
-]
+])
+
 if ALLOW_ALL_CORS:
     cors_origins = ["*"]
 
@@ -71,7 +78,12 @@ class TranscriptionResponse(BaseModel):
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "mock": USE_MOCK, "allow_all_cors": ALLOW_ALL_CORS}
+    return {
+        "status": "ok",
+        "mock": USE_MOCK,
+        "allow_all_cors": ALLOW_ALL_CORS,
+        "origins": cors_origins,
+    }
 
 @app.post("/upload", response_model=TranscriptionResponse)
 async def upload(file: UploadFile = File(...)):

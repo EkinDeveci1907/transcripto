@@ -1,0 +1,18 @@
+# Ignore files not needed in build context
+.git
+.gitignore
+**/__pycache__
+*.pyc
+*.pyo
+*.pyd
+backend/.venv
+node_modules
+frontend/node_modules
+frontend/.next
+frontend/coverage
+backend/.coverage*
+backend/.pytest_cache
+.env
+.env.*
+# Keep example envs
+!**/.env.example
