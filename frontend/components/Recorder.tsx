@@ -16,6 +16,7 @@ export default function Recorder() {
   const [processMs, setProcessMs] = useState<string | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
+  const recordedMimeRef = useRef<string>('');
   const [dragActive, setDragActive] = useState(false);
   
   // If defined at build time, use direct backend uploads for large files to bypass
@@ -35,12 +36,22 @@ export default function Recorder() {
       mediaRecorder.ondataavailable = (e) => {
         if (e.data.size > 0) {
           chunksRef.current.push(e.data);
+          if (!recordedMimeRef.current && (e as any).data?.type) {
+            recordedMimeRef.current = (e as any).data.type;
+          }
         }
       };
 
       mediaRecorder.onstop = async () => {
-        const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
-        await upload(blob);
+        const mime = recordedMimeRef.current || 'audio/webm';
+        const blob = new Blob(chunksRef.current, { type: mime });
+        // derive a friendly extension from mime
+        let ext = 'webm';
+        if (/m4a|mp4/i.test(mime)) ext = 'm4a';
+        else if (/wav/i.test(mime)) ext = 'wav';
+        else if (/ogg/i.test(mime)) ext = 'ogg';
+        else if (/mp3|mpeg/i.test(mime)) ext = 'mp3';
+        await upload(blob, `audio.${ext}`);
       };
 
       mediaRecorder.start();
@@ -70,7 +81,21 @@ export default function Recorder() {
 
       // If we have a public backend URL, always upload directly (removes size caps on proxy).
       if (directApiBase) {
-        const resp = await fetch(`${directApiBase}/upload`, { method: 'POST', body: formData });
+        let resp: Response;
+        try {
+          resp = await fetch(`${directApiBase}/upload`, { method: 'POST', body: formData });
+        } catch (networkErr: any) {
+          // If direct upload fails (CORS/network) and the payload is small, fallback to proxy
+          if (blob.size < 4_000_000) {
+            const fallback = await axios.post<ApiResponse>(apiUploadUrl, formData);
+            setResult(fallback.data);
+            const ms2 = fallback.headers?.['x-process-time-ms'];
+            if (ms2) setProcessMs(String(ms2));
+            if (fallback.data.summary_error) setError(fallback.data.summary_error);
+            return;
+          }
+          throw networkErr;
+        }
         const ms = resp.headers.get('x-process-time-ms');
         if (ms) setProcessMs(ms);
         const contentType = resp.headers.get('content-type') || '';
