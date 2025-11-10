@@ -46,9 +46,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+from typing import Optional
+
 class TranscriptionResponse(BaseModel):
     transcript: str
-    summary: str
+    summary: Optional[str]
+    summary_error: Optional[str] = None
 
 @app.get("/health")
 async def health():
@@ -70,37 +73,46 @@ async def upload(file: UploadFile = File(...)):
             tmp.write(contents)
             tmp_path = tmp.name
 
+        summary_error: Optional[str] = None
+
         if USE_MOCK:
             transcript_text = f"[mock] Received {len(contents)} bytes from {file.filename}."
             summary_text = "[mock] Summary: Demo mode is enabled (no external API calls)."
         else:
             client = get_openai_client()
             # Transcribe with Whisper
-            with open(tmp_path, "rb") as f:
-                transcription = client.audio.transcriptions.create(
-                    model=WHISPER_MODEL,
-                    file=f,
-                    response_format="text"
-                )
-            transcript_text = transcription
+            try:
+                with open(tmp_path, "rb") as f:
+                    transcription = client.audio.transcriptions.create(
+                        model=WHISPER_MODEL,
+                        file=f,
+                        response_format="text"
+                    )
+                transcript_text = transcription
+            except Exception as te:
+                raise HTTPException(status_code=500, detail=f"transcription_failed: {te}")
 
             if not transcript_text.strip():
                 raise HTTPException(status_code=500, detail="Empty transcript")
 
-            # Summarize with GPT
-            prompt = (
-                "You are an assistant that summarizes spoken content. Provide: 1) A concise summary (<=60 words). "
-                "2) 3 key bullet insights.\n\nTranscript:\n" + transcript_text
-            )
-            completion = client.chat.completions.create(
-                model=SUMMARY_MODEL,
-                messages=[{"role": "system", "content": "Summarize user audio."}, {"role": "user", "content": prompt}],
-                temperature=0.4,
-                max_tokens=300
-            )
-            summary_text = completion.choices[0].message.content.strip()
+            # Attempt summary separately so we can still return transcript
+            try:
+                prompt = (
+                    "You are an assistant that summarizes spoken content. Provide: 1) A concise summary (<=60 words). "
+                    "2) 3 key bullet insights.\n\nTranscript:\n" + transcript_text
+                )
+                completion = client.chat.completions.create(
+                    model=SUMMARY_MODEL,
+                    messages=[{"role": "system", "content": "Summarize user audio."}, {"role": "user", "content": prompt}],
+                    temperature=0.4,
+                    max_tokens=300
+                )
+                summary_text = completion.choices[0].message.content.strip()
+            except Exception as se:
+                summary_text = None
+                summary_error = f"summary_failed: {se}"
 
-        return TranscriptionResponse(transcript=transcript_text, summary=summary_text)
+        return TranscriptionResponse(transcript=transcript_text, summary=summary_text, summary_error=summary_error)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     finally:
