@@ -66,20 +66,20 @@ export default function Recorder() {
     setProcessMs(null);
     try {
       const formData = new FormData();
-      // Preserve provided filename when available; default to generic name
       formData.append('file', blob, filename || 'audio.webm');
 
-      // If a large file and we have a public backend URL, upload directly to the backend
-      // to avoid Vercel's serverless body-size limits on the proxy route.
-      const isLarge = blob.size > 4_000_000; // ~4MB threshold
-      if (isLarge && directApiBase) {
+      // If we have a public backend URL, always upload directly (removes size caps on proxy).
+      if (directApiBase) {
         const resp = await fetch(`${directApiBase}/upload`, { method: 'POST', body: formData });
         const ms = resp.headers.get('x-process-time-ms');
         if (ms) setProcessMs(ms);
         const contentType = resp.headers.get('content-type') || '';
         if (!resp.ok) {
+          if (resp.status === 413) {
+            throw new Error('File too large for server limits. Try a shorter clip or compress.');
+          }
           const payload = contentType.includes('application/json') ? await resp.json() : { detail: await resp.text() };
-          throw new Error(payload?.detail || 'Upload failed');
+          throw new Error(payload?.detail || `Upload failed (${resp.status})`);
         }
         const data = contentType.includes('application/json') ? await resp.json() : { transcript: await resp.text(), summary: '' };
         setResult(data as ApiResponse);
@@ -87,7 +87,7 @@ export default function Recorder() {
         return;
       }
 
-      // Default path: use our Next.js proxy route
+      // Fallback: use Next proxy route
       const response = await axios.post<ApiResponse>(apiUploadUrl, formData);
       setResult(response.data);
       const ms = response.headers?.['x-process-time-ms'];
