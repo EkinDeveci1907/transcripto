@@ -1,5 +1,6 @@
 fastapi==0.111.0
-uvicorn[standard]==0.30.1
+# Use plain uvicorn in CI/runtime; avoid optional C extensions (uvloop/httptools)
+uvicorn==0.30.1
 python-dotenv==1.0.1
 openai==1.43.0
 pydantic==2.9.2
