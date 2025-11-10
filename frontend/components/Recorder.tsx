@@ -4,7 +4,8 @@ import axios from 'axios';
 
 interface ApiResponse {
   transcript: string;
-  summary: string;
+  summary: string | null;
+  summary_error?: string | null;
 }
 
 export default function Recorder() {
@@ -63,6 +64,10 @@ export default function Recorder() {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
       setResult(response.data);
+      // If backend provided a summary_error, surface it non-blocking
+      if (response.data.summary_error) {
+        setError(response.data.summary_error);
+      }
     } catch (err: any) {
       setError(err.response?.data?.detail || err.message || 'Upload failed');
     } finally {
@@ -149,7 +154,11 @@ export default function Recorder() {
           </div>
           <div>
             <h2 className="text-xl font-semibold mb-1">AI Summary</h2>
-            <p className="whitespace-pre-wrap text-sm leading-relaxed text-white/90">{result.summary}</p>
+            {result.summary ? (
+              <p className="whitespace-pre-wrap text-sm leading-relaxed text-white/90">{result.summary}</p>
+            ) : (
+              <p className="text-sm text-white/70">No summary available.</p>
+            )}
           </div>
         </div>
       )}

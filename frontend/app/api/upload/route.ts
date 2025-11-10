@@ -6,7 +6,8 @@ export const runtime = 'nodejs';
 export async function POST(req: NextRequest) {
   try {
   // Prefer IPv4 loopback to avoid environments where 'localhost' resolves to ::1 (IPv6)
-  const backendBase = process.env.NEXT_PUBLIC_API_BASE || 'http://127.0.0.1:8000';
+  // In Docker Compose, BACKEND_BASE_URL can be set to http://backend:8000
+  const backendBase = process.env.BACKEND_BASE_URL || process.env.NEXT_PUBLIC_API_BASE || 'http://127.0.0.1:8000';
 
     // Read incoming multipart form-data
     const incoming = await req.formData();

@@ -1,6 +1,7 @@
 import os
+import time
 import tempfile
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, UploadFile, File, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 from pydantic import BaseModel
@@ -28,6 +29,21 @@ def get_openai_client():
         raise RuntimeError(f"Failed to initialize OpenAI client: {e}. Try pinning httpx==0.27.2 & httpcore==0.18.0 or upgrading openai.")
 
 app = FastAPI(title="Transcripto Backend")
+
+# Simple timing middleware for observability
+@app.middleware("http")
+async def timing_middleware(request: Request, call_next):
+    start = time.perf_counter()
+    response = await call_next(request)
+    duration_ms = (time.perf_counter() - start) * 1000
+    # Add a header for debugging and log basic info
+    response.headers["X-Process-Time-ms"] = f"{duration_ms:.1f}"
+    size = request.headers.get("content-length", "?")
+    method = request.method
+    path = request.url.path
+    # Use print for simplicity (can switch to logging module later)
+    print(f"[req] {method} {path} size={size} took={duration_ms:.1f}ms")
+    return response
 
 ALLOW_ALL_CORS = os.getenv("DEV_ALLOW_ALL_CORS", "false").lower() == "true"
 

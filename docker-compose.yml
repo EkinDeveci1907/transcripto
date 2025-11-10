@@ -1,0 +1,27 @@
+version: '3.9'
+services:
+  backend:
+    build:
+      context: ./backend
+    image: transcripto-backend:latest
+    environment:
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      USE_MOCK: ${USE_MOCK:-false}
+      OPENAI_SUMMARY_MODEL: ${OPENAI_SUMMARY_MODEL:-gpt-4o-mini}
+      OPENAI_WHISPER_MODEL: ${OPENAI_WHISPER_MODEL:-whisper-1}
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+    image: transcripto-frontend:latest
+    depends_on:
+      - backend
+    environment:
+      # No secret needed client-side; point API proxy to backend container
+      BACKEND_BASE_URL: http://backend:8000
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
