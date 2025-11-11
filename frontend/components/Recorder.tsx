@@ -18,6 +18,7 @@ export default function Recorder() {
   const chunksRef = useRef<Blob[]>([]);
   const recordedMimeRef = useRef<string>('');
   const [dragActive, setDragActive] = useState(false);
+  const maxFileMb = Number(process.env.NEXT_PUBLIC_MAX_FILE_MB || '25');
   
   // If defined at build time, use direct backend uploads for large files to bypass
   // Vercel serverless body-size limits. We still keep the proxy for small blobs.
@@ -51,6 +52,13 @@ export default function Recorder() {
         else if (/wav/i.test(mime)) ext = 'wav';
         else if (/ogg/i.test(mime)) ext = 'ogg';
         else if (/mp3|mpeg/i.test(mime)) ext = 'mp3';
+        // enforce size cap for mic recordings too
+        const sizeMb = blob.size / (1024 * 1024);
+        if (sizeMb > maxFileMb) {
+          setError(`Recording is ${sizeMb.toFixed(1)} MB; limit is ${maxFileMb} MB for free tier. Please record a shorter clip.`);
+          setRecording(false);
+          return;
+        }
         await upload(blob, `audio.${ext}`);
       };
 
@@ -129,6 +137,12 @@ export default function Recorder() {
     if (!file) return;
     setResult(null);
     setProcessMs(null);
+    // Enforce size limit early for free-tier backend
+    const sizeMb = file.size / (1024 * 1024);
+    if (sizeMb > maxFileMb) {
+      setError(`File is ${sizeMb.toFixed(1)} MB; limit is ${maxFileMb} MB for free tier. Please use a shorter clip or compress.`);
+      return;
+    }
     const allowed = [
       'audio/webm','audio/wav','audio/x-wav','audio/mpeg','audio/mp3','audio/ogg','audio/mp4','audio/m4a',
       'video/mp4','video/mpeg','video/quicktime'
@@ -186,6 +200,7 @@ export default function Recorder() {
             className={`border-2 border-dashed rounded-xl p-6 text-center transition ${dragActive ? 'border-indigo-400 bg-white/10' : 'border-white/20'}`}
           >
             <p className="text-sm mb-3 text-white/70">mp3, mp4, wav, webm, ogg, m4a</p>
+            <p className="text-[10px] mb-2 text-white/40">Max {maxFileMb} MB</p>
             <input id="file-input" type="file" accept="audio/*,video/mp4,video/mpeg,video/quicktime" onChange={onInputChange} className="hidden" />
             <label htmlFor="file-input" className="primary inline-block cursor-pointer">Choose a file</label>
           </div>
